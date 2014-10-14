@@ -19,6 +19,7 @@ import com.badlogic.gdx.math.MathUtils;
 import com.badlogic.gdx.math.Matrix4;
 import com.badlogic.gdx.math.Vector3;
 import com.badlogic.gdx.physics.bullet.Bullet;
+import com.badlogic.gdx.physics.bullet.DebugDrawer;
 import com.badlogic.gdx.physics.bullet.collision.Collision;
 import com.badlogic.gdx.physics.bullet.collision.ContactListener;
 import com.badlogic.gdx.physics.bullet.collision.btBoxShape;
@@ -39,6 +40,8 @@ import com.badlogic.gdx.physics.bullet.dynamics.btDiscreteDynamicsWorld;
 import com.badlogic.gdx.physics.bullet.dynamics.btDynamicsWorld;
 import com.badlogic.gdx.physics.bullet.dynamics.btRigidBody;
 import com.badlogic.gdx.physics.bullet.dynamics.btSequentialImpulseConstraintSolver;
+import com.badlogic.gdx.physics.bullet.extras.btBulletWorldImporter;
+import com.badlogic.gdx.physics.bullet.linearmath.btIDebugDraw;
 import com.badlogic.gdx.physics.bullet.linearmath.btMotionState;
 import com.badlogic.gdx.utils.Array;
 import com.badlogic.gdx.utils.ArrayMap;
@@ -52,10 +55,10 @@ public class BulletTest implements ApplicationListener {
     class MyContactListener extends ContactListener {
         @Override
         public boolean onContactAdded(int userValue0, int partId0, int index0, boolean match0, int userValue1, int partId1, int index1, boolean match1) {
-            if (match0)
-                ((ColorAttribute) instances.get(userValue0).materials.get(0).get(ColorAttribute.Diffuse)).color.set(Color.WHITE);
-            if (match1)
-                ((ColorAttribute) instances.get(userValue1).materials.get(0).get(ColorAttribute.Diffuse)).color.set(Color.WHITE);
+//            if (match0)
+//                ((ColorAttribute) instances.get(userValue0).materials.get(0).get(ColorAttribute.Diffuse)).color.set(Color.WHITE);
+//            if (match1)
+//                ((ColorAttribute) instances.get(userValue1).materials.get(0).get(ColorAttribute.Diffuse)).color.set(Color.WHITE);
             return true;
         }
     }
@@ -138,10 +141,12 @@ public class BulletTest implements ApplicationListener {
     btDynamicsWorld dynamicsWorld;
     btConstraintSolver constraintSolver;
 
+    DebugDrawer debugDrawer;
+    
     @Override
     public void create() {
         Bullet.init();
-
+        
         modelBatch = new ModelBatch();
         environment = new Environment();
         environment.set(new ColorAttribute(ColorAttribute.AmbientLight, 0.4f, 0.4f, 0.4f, 1f));
@@ -161,7 +166,7 @@ public class BulletTest implements ApplicationListener {
         mb.begin();
         mb.node().id = "ground";
         mb.part("ground", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal, new Material(ColorAttribute.createDiffuse(Color.RED)))
-                .box(5f, 1f, 5f);
+                .box(80f, 1f, 80f);
         mb.node().id = "sphere";
         mb.part("sphere", GL20.GL_TRIANGLES, Usage.Position | Usage.Normal, new Material(ColorAttribute.createDiffuse(Color.GREEN)))
                 .sphere(1f, 1f, 1f, 10, 10);
@@ -180,19 +185,19 @@ public class BulletTest implements ApplicationListener {
         model = mb.end();
 
         constructors = new ArrayMap<String, GameObject.Constructor>(String.class, GameObject.Constructor.class);
-        constructors.put("ground", new GameObject.Constructor(model, "ground", new btBoxShape(new Vector3(2.5f, 0.5f, 2.5f)), 0f));
+        constructors.put("ground", new GameObject.Constructor(model, "ground", new btBoxShape(new Vector3(40f, 0.5f, 40f)), 0f));
         constructors.put("sphere", new GameObject.Constructor(model, "sphere", new btSphereShape(0.5f), 1f));
         constructors.put("box", new GameObject.Constructor(model, "box", new btBoxShape(new Vector3(0.5f, 0.5f, 0.5f)), 1f));
         constructors.put("cone", new GameObject.Constructor(model, "cone", new btConeShape(0.5f, 2f), 1f));
         constructors.put("capsule", new GameObject.Constructor(model, "capsule", new btCapsuleShape(.5f, 1f), 1f));
         constructors.put("cylinder", new GameObject.Constructor(model, "cylinder", new btCylinderShape(new Vector3(.5f, 1f, .5f)), 1f));
-
+        
         collisionConfig = new btDefaultCollisionConfiguration();
         dispatcher = new btCollisionDispatcher(collisionConfig);
         broadphase = new btDbvtBroadphase();
         constraintSolver = new btSequentialImpulseConstraintSolver();
         dynamicsWorld = new btDiscreteDynamicsWorld(dispatcher, broadphase, constraintSolver, collisionConfig);
-        dynamicsWorld.setGravity(new Vector3(0, -30f, 0));
+        //pdynamicsWorld.setGravity(new Vector3(0, -10f, 0));
         contactListener = new MyContactListener();
 
         instances = new Array<GameObject>();
@@ -204,35 +209,51 @@ public class BulletTest implements ApplicationListener {
         object.body.setContactCallbackFlag(GROUND_FLAG);
         object.body.setContactCallbackFilter(0);
         object.body.setActivationState(Collision.DISABLE_DEACTIVATION);
+        
+        object.transform.trn(0, -10, 0);
+        object.body.proceedToTransform(object.transform);
+        
+        btBulletWorldImporter bwi = new btBulletWorldImporter(dynamicsWorld);
+        if(bwi.loadFile(Gdx.files.internal("test.bullet"))){
+            System.out.print("YAY");
+        }else{
+            System.out.print("NAY");
+        }
+        debugDrawer = new DebugDrawer();
+        dynamicsWorld.setDebugDrawer(debugDrawer);
+        debugDrawer.setDebugMode(btIDebugDraw.DebugDrawModes.DBG_MAX_DEBUG_DRAW_MODE);
+        dynamicsWorld.setGravity(new Vector3(0, -10f, 0));
     }
 
     public void spawn() {
-        GameObject obj = constructors.values[1 + MathUtils.random(constructors.size - 2)].construct();
+        GameObject obj = constructors.values[1 + 1].construct(); // MathUtils.random(constructors.size - 2)
         obj.transform.setFromEulerAngles(MathUtils.random(360f), MathUtils.random(360f), MathUtils.random(360f));
-        obj.transform.trn(MathUtils.random(-2.5f, 2.5f), 9f, MathUtils.random(-2.5f, 2.5f));
+        //obj.transform.trn(MathUtils.random(-2.5f, 2.5f), 15f, MathUtils.random(-2.5f, 2.5f));
+        obj.transform.trn(0, 10, 0);
         obj.body.proceedToTransform(obj.transform);
         obj.body.setUserValue(instances.size);
-        obj.body.setCollisionFlags(obj.body.getCollisionFlags() | btCollisionObject.CollisionFlags.CF_CUSTOM_MATERIAL_CALLBACK);
+        //obj.body.setCollisionFlags(obj.body.getCollisionFlags() | btCollisionObject.CollisionFlags.CF_CUSTOM_MATERIAL_CALLBACK);
         instances.add(obj);
         dynamicsWorld.addRigidBody(obj.body);
         obj.body.setContactCallbackFlag(OBJECT_FLAG);
         obj.body.setContactCallbackFilter(GROUND_FLAG);
+        //obj.body.applyCentralForce(new Vector3(0,2000,0));
     }
 
-    float angle, speed = 90f;
+    float angle, speed = 180f;
 
     @Override
     public void render() {
         final float delta = Math.min(1f / 30f, Gdx.graphics.getDeltaTime());
 
         angle = (angle + delta * speed) % 360f;
-        instances.get(0).transform.setTranslation(0, MathUtils.sinDeg(angle) * 2.5f, 0f);
+        //instances.get(0).transform.setTranslation(0, MathUtils.sinDeg(angle) * 5.0f, 0f);
 
         dynamicsWorld.stepSimulation(delta, 5, 1f / 60f);
 
         if ((spawnTimer -= delta) < 0) {
             spawn();
-            spawnTimer = 1.5f;
+            spawnTimer = 0.5f;
         }
 
         camController.update();
@@ -240,9 +261,12 @@ public class BulletTest implements ApplicationListener {
         Gdx.gl.glClearColor(0.3f, 0.3f, 0.3f, 1.f);
         Gdx.gl.glClear(GL20.GL_COLOR_BUFFER_BIT | GL20.GL_DEPTH_BUFFER_BIT);
 
-        modelBatch.begin(cam);
-        modelBatch.render(instances, environment);
-        modelBatch.end();
+//        modelBatch.begin(cam);
+//        modelBatch.render(instances, environment);
+//        modelBatch.end();
+        debugDrawer.begin(cam);
+        dynamicsWorld.debugDrawWorld();
+        debugDrawer.end();
     }
 
     @Override
